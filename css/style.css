@@ -88,11 +88,11 @@ h1, h2, h3 { font-family: var(--font-display); letter-spacing: .04em; margin: 0;
 
 /* ---------- Arc bar ---------- */
 .arcbar {
-  display: flex; align-items: center; gap: 10px; padding: 4px 20px 12px;
+  display: flex; align-items: center; gap: 8px 10px; padding: 4px 20px 12px; flex-wrap: wrap;
   border-bottom: 1px solid var(--border);
 }
 .arcbar-label { font-size: 11px; text-transform: uppercase; letter-spacing: .12em; color: var(--muted); flex: none; }
-.arc-chips { display: flex; gap: 6px; overflow-x: auto; flex: 1; scrollbar-width: thin; padding-bottom: 2px; }
+.arc-chips { display: flex; gap: 6px; overflow-x: auto; flex: 0 1 auto; max-width: 100%; min-width: 0; scrollbar-width: thin; padding-bottom: 2px; }
 .arc-chip {
   flex: none; display: inline-flex; align-items: center; gap: 6px;
   padding: 5px 10px 5px 8px; border-radius: 999px; border: 1px solid var(--border);
@@ -102,7 +102,7 @@ h1, h2, h3 { font-family: var(--font-display); letter-spacing: .04em; margin: 0;
 .arc-chip i { width: 10px; height: 10px; border-radius: 50%; background: var(--c); box-shadow: 0 0 6px var(--c); }
 .arc-chip:hover { color: var(--text); border-color: var(--c); }
 .arc-chip[aria-pressed="true"] { color: var(--text); border-color: var(--c); background: color-mix(in srgb, var(--c) 18%, transparent); }
-.toggles { display: flex; gap: 14px; flex: none; }
+.toggles { display: flex; gap: 14px; flex: none; margin-left: auto; flex-wrap: wrap; }
 
 .switch { display: inline-flex; align-items: center; gap: 8px; font-size: 12.5px; color: var(--muted); cursor: pointer; user-select: none; white-space: nowrap; }
 .switch input { position: absolute; opacity: 0; pointer-events: none; }
@@ -155,7 +155,7 @@ main { flex: 1; position: relative; min-height: 0; display: flex; }
 .lg-dot.read { background: var(--read); border-color: var(--read); }
 .lg-route { width: 22px; height: 4px; border-radius: 2px; background: var(--gold-2); box-shadow: 0 0 8px var(--gold); }
 .hint {
-  position: absolute; left: 50%; bottom: 14px; transform: translateX(-50%); z-index: 4;
+  position: absolute; left: 50%; top: 14px; transform: translateX(-50%); z-index: 4;
   background: var(--panel); border: 1px solid var(--border); border-radius: 999px; padding: 6px 14px; font-size: 12px; color: var(--muted);
   pointer-events: none; transition: opacity .6s;
 }
@@ -395,3 +395,18 @@ main { flex: 1; position: relative; min-height: 0; display: flex; }
   .legend .lg-row:nth-child(4) { display: none; }
   .drawer { width: 100vw; }
 }
+
+/* dependency arrows + short stories */
+.dep-line { fill: none; stroke: var(--gold-2); stroke-width: 2; stroke-dasharray: 5 4; opacity: .9; }
+.station.short .pill { stroke-width: 1.8; stroke: #c4c7d0; }
+.station.short .label { font-size: 10px; fill: #b9bdc8; font-style: italic; }
+.station.short .route-badge circle { r: 6.5px; }
+.station.short .route-badge text { font-size: 8px; }
+.lg-deparrow { width: 22px; height: 0; border-top: 2px dashed var(--gold-2); display: inline-block; }
+.d-deps { display: flex; flex-direction: column; gap: 4px; }
+.d-link { background: rgba(255,255,255,.03); border: 1px solid var(--border); border-radius: 8px; padding: 7px 10px; text-align: left; font-size: 13px; display: flex; align-items: center; gap: 8px; }
+.d-link:hover { border-color: var(--gold); color: var(--gold-2); }
+.d-link i { width: 8px; height: 8px; border-radius: 50%; background: var(--c); flex: none; }
+.prose a { color: var(--gold-2); }
+@media (max-width: 900px) { .lg-dep { display: none !important; } }
+@media (max-width: 1700px) { .arcbar-label { display: none; } .arcbar { padding-top: 2px; } .toggles { flex-basis: auto; } }

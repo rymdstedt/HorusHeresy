@@ -4,8 +4,9 @@
 
 Every Horus Heresy novel, anthology, Primarchs prequel and Siege of Terra book, drawn as a metro map. Coloured storyline lines all converge on Terra.
 
-- **Pick a route:** *Express* (22 books: the essentials), *Main Campaign* (40), *Completionist* (67), or *Build your own*.
+- **Pick a route:** *Express* (22 books: the essentials), *Main Campaign* (40), *Completionist* (68), or *Build your own*.
 - **Add storylines** such as Prospero, the White Scars, Caliban or Ultramar. Their books are woven into your reading order.
+- **Read-first arrows and key short stories:** select a book to see what to read before it and what it leads into. Switch on *Key short stories* to add the gateway shorts and novellas. Both are adapted from [Daunt's Horus Heresy Timeline](https://gaming.kylebb.com/hhtimeline/).
 - **Track progress:** tick books off in the reading list. Progress is saved in your browser, and the URL shares your exact route.
 
 ## Project layout

@@ -18,13 +18,16 @@
     { id: "b3", name: "Book III · The Road to Terra", sub: "The traitors close on the Sol System", test: b => b.order >= 29 && b.order < 100 },
     { id: "siege", name: "Book IV · The Siege of Terra", sub: "The end of the Horus Heresy", test: b => b.order > 100 }
   ];
-  const KIND_LABEL = { novel: "Novel", anthology: "Anthology", novella: "Siege novella", primarchs: "Primarchs prequel", siege: "Siege of Terra" };
+  const KIND_LABEL = { novel: "Novel", anthology: "Anthology", novella: "Siege novella", primarchs: "Primarchs prequel", siege: "Siege of Terra", short: "Key short story / novella" };
+  const DEPS = window.DEPS || {};
+  const DEPENDENTS = {};
+  Object.entries(DEPS).forEach(([k, list]) => list.forEach(d => { (DEPENDENTS[d] = DEPENDENTS[d] || []).push(k); }));
   const TIER_LABEL = { core: "Essential", rec: "Recommended", opt: "Optional" };
 
   /* ------------------------------------------------------------------ state */
   const STATE_KEY = "rtt-state-v1";
   const READ_KEY = "rtt-read-v1";
-  const S = { preset: "express", arcs: new Set(), anth: false, prim: false, showAll: false, view: "map", selected: null };
+  const S = { preset: "express", arcs: new Set(), anth: false, prim: false, shorts: false, showAll: false, view: "map", selected: null };
   let READ = new Set();
 
   function safeGet(k) { try { return localStorage.getItem(k); } catch (e) { return null; } }
@@ -38,7 +41,7 @@
     if (src) {
       if (PRESETS.some(p => p.id === src.preset)) S.preset = src.preset;
       S.arcs = new Set((src.arcs || []).filter(a => arcById[a] && !arcById[a].noLine));
-      S.anth = !!src.anth; S.prim = !!src.prim;
+      S.anth = !!src.anth; S.prim = !!src.prim; S.shorts = !!src.shorts;
     }
   }
   function parseHash() {
@@ -46,16 +49,17 @@
     if (!h) return null;
     const p = new URLSearchParams(h);
     if (!p.has("r")) return null;
-    return { preset: p.get("r"), arcs: (p.get("a") || "").split(",").filter(Boolean), anth: p.get("an") === "1", prim: p.get("pr") === "1" };
+    return { preset: p.get("r"), arcs: (p.get("a") || "").split(",").filter(Boolean), anth: p.get("an") === "1", prim: p.get("pr") === "1", shorts: p.get("sh") === "1" };
   }
   function saveState() {
-    const o = { preset: S.preset, arcs: [...S.arcs], anth: S.anth, prim: S.prim };
+    const o = { preset: S.preset, arcs: [...S.arcs], anth: S.anth, prim: S.prim, shorts: S.shorts };
     safeSet(STATE_KEY, JSON.stringify(o));
     const p = new URLSearchParams();
     p.set("r", o.preset);
     if (o.arcs.length) p.set("a", o.arcs.join(","));
     if (o.anth) p.set("an", "1");
     if (o.prim) p.set("pr", "1");
+    if (o.shorts) p.set("sh", "1");
     try { history.replaceState(null, "", "#" + p.toString()); } catch (e) { /* ignore */ }
   }
   function saveRead() { safeSet(READ_KEY, JSON.stringify([...READ])); }
@@ -71,19 +75,31 @@
     return false;
   }
   function inRoute(b) {
+    if (b.kind === "short") return S.shorts && (S.preset === "complete" || b.arcs.some(a => S.arcs.has(a)));
     if (b.kind === "primarchs") return S.prim;
     if (b.kind === "anthology") return S.anth;
     return inPreset(b, S.preset) || b.arcs.some(a => S.arcs.has(a));
   }
   let ROUTE = [], ROUTE_POS = {};
   function computeRoute() {
-    ROUTE = BOOKS.filter(inRoute);
+    const on = new Set(BOOKS.filter(inRoute).map(b => b.id));
+    // key short stories that lead into a book on the route come along too
+    if (S.shorts) {
+      let grew = true;
+      while (grew) {
+        grew = false;
+        BOOKS.forEach(b => {
+          if (b.kind === "short" && !on.has(b.id) && (DEPENDENTS[b.id] || []).some(d => on.has(d))) { on.add(b.id); grew = true; }
+        });
+      }
+    }
+    ROUTE = BOOKS.filter(b => on.has(b.id));
     ROUTE_POS = {};
     ROUTE.forEach((b, i) => { ROUTE_POS[b.id] = i + 1; });
   }
   function presetCount(pid) {
-    if (pid === "complete") return BOOKS.filter(b => b.kind !== "primarchs").length;
-    return BOOKS.filter(b => b.kind !== "primarchs" && b.kind !== "anthology" && inPreset(b, pid)).length;
+    if (pid === "complete") return BOOKS.filter(b => b.kind !== "primarchs" && b.kind !== "short").length;
+    return BOOKS.filter(b => b.kind !== "primarchs" && b.kind !== "anthology" && b.kind !== "short" && inPreset(b, pid)).length;
   }
 
   /* ------------------------------------------------------------------ helpers */
@@ -120,57 +136,59 @@
     document.querySelectorAll(".arc-chip").forEach(b => b.setAttribute("aria-pressed", S.arcs.has(b.dataset.arc)));
     $("#tglAnth").checked = S.anth;
     $("#tglPrim").checked = S.prim;
-    const k = { novel: 0, siege: 0, anthology: 0, primarchs: 0 };
+    $("#tglShorts").checked = S.shorts;
+    const k = { novel: 0, siege: 0, anthology: 0, primarchs: 0, short: 0 };
     ROUTE.forEach(b => { k[b.kind === "novella" ? "siege" : b.kind]++; });
     const parts = [];
     if (k.primarchs) parts.push(`${k.primarchs} prequels`);
     parts.push(`${k.novel} Heresy novels`);
     if (k.anthology) parts.push(`${k.anthology} anthologies`);
+    if (k.short) parts.push(`${k.short} short stories`);
     parts.push(`${k.siege} Siege books`);
     const readN = ROUTE.filter(b => READ.has(b.id)).length;
-    $("#routeSummary").innerHTML = `Your route: <strong>${ROUTE.length} of ${BOOKS.length} books</strong><br>${parts.join(" · ")}${readN ? ` · <span style="color:var(--read)">${readN} read</span>` : ""}`;
+    $("#routeSummary").innerHTML = `Your route: <strong>${ROUTE.length} of ${BOOKS.filter(b => S.shorts || b.kind !== "short").length} books</strong><br>${parts.join(" · ")}${readN ? ` · <span style="color:var(--read)">${readN} read</span>` : ""}`;
   }
 
   /* ------------------------------------------------------------------ MAP layout */
   const LANE_H = 58, TOP = 118, PRO_X0 = 250, PRO_COL = 70, COL = 60, SCOL = 112, GAP = 4.6;
-  const POS = {};
-  (function layout() {
+  let POS, L, TERRA, CONTENT_W, CONTENT_H, ARC_PATHS, THROUGH, MAP_BOOKS;
+  function computeLayout() {
+    MAP_BOOKS = BOOKS.filter(b => b.kind !== "short" || S.shorts);
+    POS = {}; L = {};
     // prologue: primarchs share up to two columns per lane
     const proCount = {};
-    BOOKS.filter(b => b.order < 0).forEach(b => {
+    MAP_BOOKS.filter(b => b.order < 0).forEach(b => {
       const lane = b.arcs[0];
       const c = proCount[lane] = (proCount[lane] || 0);
       proCount[lane]++;
       POS[b.id] = { x: PRO_X0 + c * PRO_COL, y: TOP + laneIndex[lane] * LANE_H };
     });
     const MAIN_X0 = PRO_X0 + PRO_COL + 150;
-    const main = BOOKS.filter(b => b.order > 0 && b.order < 100);
+    const main = MAP_BOOKS.filter(b => b.order > 0 && b.order < 100);
     main.forEach((b, i) => { POS[b.id] = { x: MAIN_X0 + i * COL, y: TOP + laneIndex[b.arcs[0]] * LANE_H }; });
     const SIEGE_X0 = MAIN_X0 + (main.length - 1) * COL + 190;
-    const siege = BOOKS.filter(b => b.order > 100);
+    const siege = MAP_BOOKS.filter(b => b.order > 100);
     siege.forEach((b, i) => { POS[b.id] = { x: SIEGE_X0 + i * SCOL, y: TOP + laneIndex[b.arcs[0]] * LANE_H }; });
-    layout.terraX = SIEGE_X0 + (siege.length - 1) * SCOL + 260;
-    layout.mainX0 = MAIN_X0; layout.siegeX0 = SIEGE_X0;
-    window.__layout = layout;
-  })();
-  const L = window.__layout;
-  const TERRA = { x: L.terraX, y: TOP + laneIndex[window.SIEGE_LANE] * LANE_H };
-  const CONTENT_W = TERRA.x + 220;
-  const CONTENT_H = TOP + ARCS.length * LANE_H + 30;
+    L.terraX = SIEGE_X0 + (siege.length - 1) * SCOL + 260;
+    L.mainX0 = MAIN_X0; L.siegeX0 = SIEGE_X0;
+    TERRA = { x: L.terraX, y: TOP + laneIndex[window.SIEGE_LANE] * LANE_H };
+    CONTENT_W = TERRA.x + 220;
+    CONTENT_H = TOP + ARCS.length * LANE_H + 30;
 
-  // Which line-arcs pass through each station (ordered top→bottom by lane)
-  const ARC_PATHS = {};
-  LINE_ARCS.forEach(a => {
-    // anthologies only sit on their own lane's line, so they never drag other lines across the map
-    const members = arcBooks(a.id).filter(b => b.kind !== "anthology" || b.arcs[0] === a.id);
-    const pre = members.filter(b => b.order < 100);
-    const post = members.filter(b => b.order > 100 && b.id !== CONVERGE);
-    ARC_PATHS[a.id] = [...pre, byId[CONVERGE], ...post];
-  });
-  const THROUGH = {};
-  BOOKS.forEach(b => { THROUGH[b.id] = []; });
-  LINE_ARCS.forEach(a => ARC_PATHS[a.id].forEach(b => { if (!THROUGH[b.id].includes(a.id)) THROUGH[b.id].push(a.id); }));
-  Object.values(THROUGH).forEach(list => list.sort((x, y) => laneIndex[x] - laneIndex[y]));
+    // Which line-arcs pass through each station (ordered top→bottom by lane)
+    ARC_PATHS = {};
+    LINE_ARCS.forEach(a => {
+      // anthologies only sit on their own lane's line, so they never drag other lines across the map
+      const members = MAP_BOOKS.filter(b => b.arcs.includes(a.id) && (b.kind !== "anthology" || b.arcs[0] === a.id));
+      const pre = members.filter(b => b.order < 100);
+      const post = members.filter(b => b.order > 100 && b.id !== CONVERGE);
+      ARC_PATHS[a.id] = [...pre, byId[CONVERGE], ...post];
+    });
+    THROUGH = {};
+    MAP_BOOKS.forEach(b => { THROUGH[b.id] = []; });
+    LINE_ARCS.forEach(a => ARC_PATHS[a.id].forEach(b => { if (!THROUGH[b.id].includes(a.id)) THROUGH[b.id].push(a.id); }));
+    Object.values(THROUGH).forEach(list => list.sort((x, y) => laneIndex[x] - laneIndex[y]));
+  }
   function offset(bid, aid) {
     const list = THROUGH[bid];
     const k = list.indexOf(aid);
@@ -179,7 +197,8 @@
   }
   function stationH(bid) {
     const n = Math.max(1, THROUGH[bid].length);
-    const r = byId[bid].tier === "core" ? 9 : byId[bid].tier === "rec" ? 8 : 6.5;
+    const b = byId[bid];
+    const r = b.kind === "short" ? 4.5 : b.tier === "core" ? 9 : b.tier === "rec" ? 8 : 6.5;
     return { r, h: Math.max(r * 2, (n - 1) * GAP + r * 2) };
   }
   const curve = (x1, y1, x2, y2) => {
@@ -189,10 +208,16 @@
   };
 
   /* ------------------------------------------------------------------ MAP render */
-  let svg, root, zoom, gRoute, gStations, gLines;
+  let svg, root, zoom, gRoute, gStations, gLines, gDeps, mapBuilt = false;
   function buildMap() {
+    computeLayout();
     svg = d3.select("#map");
+    const prevT = mapBuilt ? d3.zoomTransform(svg.node()) : null;
+    svg.selectAll("*").remove();
     const defs = svg.append("defs");
+    const mk = defs.append("marker").attr("id", "depArrow").attr("viewBox", "0 0 10 10").attr("refX", 9).attr("refY", 5)
+      .attr("markerWidth", 7).attr("markerHeight", 7).attr("orient", "auto-start-reverse");
+    mk.append("path").attr("d", "M0,0 L10,5 L0,10 z").attr("fill", "#f6dd9b");
     const glow = defs.append("filter").attr("id", "glow").attr("x", "-20%").attr("y", "-20%").attr("width", "140%").attr("height", "140%");
     glow.append("feGaussianBlur").attr("stdDeviation", 5);
     const tg = defs.append("radialGradient").attr("id", "terraGrad").attr("cx", "38%").attr("cy", "35%");
@@ -263,10 +288,11 @@
       .attr("d", curve(POS[last.id].x, POS[last.id].y, TERRA.x - 74, TERRA.y)).attr("stroke", arcById.horus.color).attr("stroke-width", 4.5);
 
     gRoute = root.append("g").attr("class", "route");
+    gDeps = root.append("g").attr("class", "deps");
     gStations = root.append("g").attr("class", "stations");
 
     // stations
-    BOOKS.forEach(b => {
+    MAP_BOOKS.forEach(b => {
       const p = POS[b.id], st = stationH(b.id);
       const g = gStations.append("g")
         .attr("class", `station ${b.tier} ${b.kind}${b.order > 100 ? " siegebook" : ""}`)
@@ -278,7 +304,7 @@
       g.append("path").attr("class", "check").attr("d", "M-4,0.5 L-1,3.5 L4.5,-3").style("display", "none");
       const lx = st.r + 3, ly = -st.h / 2 - 3;
       g.append("text").attr("class", "label").attr("transform", `translate(${lx},${ly}) rotate(-34)`).text(b.kind === "primarchs" ? b.title.split(":")[0] : b.title);
-      g.append("text").attr("class", "num").attr("x", 0).attr("y", st.h / 2 + 12).attr("text-anchor", "middle").text(b.num.replace("SoT novella", "Novella").replace("Primarchs", ""));
+      if (b.kind !== "short") g.append("text").attr("class", "num").attr("x", 0).attr("y", st.h / 2 + 12).attr("text-anchor", "middle").text(b.num.replace("SoT novella", "Novella").replace("Primarchs", ""));
       const badge = g.append("g").attr("class", "route-badge").attr("transform", `translate(${-st.r - 7},${-st.h / 2 - 5})`).style("display", "none");
       badge.append("circle").attr("r", 8);
       badge.append("text");
@@ -303,8 +329,9 @@
     });
     svg.call(zoom).on("dblclick.zoom", null);
     svg.on("click", () => { if (S.selected) closeDrawer(); });
-    goStart(false);
-    window.addEventListener("resize", () => positionLaneLabels(d3.zoomTransform(svg.node())));
+    if (prevT) svg.call(zoom.transform, prevT); else goStart(false);
+    if (!mapBuilt) window.addEventListener("resize", () => positionLaneLabels(d3.zoomTransform(svg.node())));
+    mapBuilt = true;
   }
   function xOf(id) { return POS[id].x; }
   function positionLaneLabels(t) {
@@ -333,7 +360,7 @@
     svg.transition().duration(700).call(zoom.transform, d3.zoomIdentity.translate((w - CONTENT_W * k) / 2, (h - CONTENT_H * k) / 2).scale(k));
   }
   function focusBook(id) {
-    const p = POS[id]; const { w, h } = mapSize();
+    const p = POS[id]; if (!p) return; const { w, h } = mapSize();
     const k = Math.max(d3.zoomTransform(svg.node()).k, 0.85);
     svg.transition().duration(800).call(zoom.transform, d3.zoomIdentity.translate(w / 2 - p.x * k - (S.selected ? 160 : 0), h / 2 - p.y * k).scale(k));
   }
@@ -372,6 +399,17 @@
       else { const q = POS[ROUTE[i - 1].id]; d += curve(q.x, q.y, p.x, p.y).replace(/^M[^CL]+/, ""); }
     }
     if (ROUTE.length) d += curve(POS[ROUTE[ROUTE.length - 1].id].x, POS[ROUTE[ROUTE.length - 1].id].y, TERRA.x - 74, TERRA.y).replace(/^M[^CL]+/, "");
+    gDeps.selectAll("*").remove();
+    if (S.selected && POS[S.selected]) {
+      const draw = (from, to) => {
+        const A = POS[from], B = POS[to]; if (!A || !B) return;
+        const back = B.x < A.x;
+        gDeps.append("path").attr("class", "dep-line").attr("marker-end", "url(#depArrow)")
+          .attr("d", back ? `M${A.x},${A.y}Q${(A.x + B.x) / 2},${Math.min(A.y, B.y) - 90} ${B.x},${B.y}` : curve(A.x + 10, A.y, B.x - 12, B.y));
+      };
+      (DEPS[S.selected] || []).forEach(d => draw(d, S.selected));
+      (DEPENDENTS[S.selected] || []).forEach(d => draw(S.selected, d));
+    }
     gRoute.selectAll("*").remove();
     gRoute.append("path").attr("class", "route-glow").attr("d", d);
     gRoute.append("path").attr("class", "route-line").attr("d", d);
@@ -428,10 +466,14 @@
         <button class="btn ${READ.has(id) ? "read-on" : "primary"}" id="dRead">${READ.has(id) ? "✓ Read" : "Mark as read"}</button>
         <button class="btn" id="dMap">Show on map</button>
       </div>
+      ${b.in ? `<div class="d-section"><h3>Collected in</h3><button class="d-link" data-go="${b.in}">${esc(byId[b.in].title)} <span class="muted">(${esc(byId[b.in].num)})</span></button></div>` : ""}
+      ${depList("Read first", DEPS[id])}
+      ${depList("Leads into", DEPENDENTS[id])}
+      ${b.kind === "anthology" ? depList("Key stories inside", BOOKS.filter(x => x.in === id).map(x => x.id)) : ""}
       <div class="d-section"><h3>Storylines</h3>${arcsHtml}</div>`;
     $("#drawerBody").querySelectorAll("[data-go]").forEach(btn => btn.addEventListener("click", () => {
       openDrawer(btn.dataset.go);
-      if (S.view === "map") focusBook(btn.dataset.go);
+      if (S.view === "map" && POS[btn.dataset.go]) focusBook(btn.dataset.go);
     }));
     $("#dRead").addEventListener("click", () => { toggleRead(id); openDrawer(id); });
     $("#dMap").addEventListener("click", () => { setView("map"); requestAnimationFrame(() => focusBook(id)); });
@@ -439,6 +481,13 @@
     $("#drawer").setAttribute("aria-hidden", "false");
     if (innerWidth < 900) $("#scrim").classList.add("show");
     updateMap();
+  }
+  function depList(title, ids) {
+    if (!ids || !ids.length) return "";
+    return `<div class="d-section"><h3>${title}</h3><div class="d-deps">${ids.map(d => {
+      const x = byId[d];
+      return `<button class="d-link" data-go="${d}"><i style="--c:${arcById[x.arcs[0]].color}"></i>${esc(x.title)}${x.kind === "short" ? ' <span class="muted">(short)</span>' : ""}${READ.has(d) ? ' <span style="color:var(--read)">✓</span>' : ""}</button>`;
+    }).join("")}</div></div>`;
   }
   function closeDrawer() {
     S.selected = null;
@@ -460,7 +509,7 @@
     const extra = [...S.arcs].map(a => arcById[a].short);
     $("#listTitle").textContent = `${preset.name} route` + (extra.length ? ` + ${extra.join(", ")}` : "");
     $("#listDesc").textContent = preset.desc;
-    const items = S.showAll ? BOOKS : ROUTE;
+    const items = S.showAll ? BOOKS.filter(b => S.shorts || b.kind !== "short") : ROUTE;
     const readN = ROUTE.filter(b => READ.has(b.id)).length;
     $("#progRead").textContent = readN; $("#progTotal").textContent = ROUTE.length;
     $("#progFill").style.width = (ROUTE.length ? readN / ROUTE.length * 100 : 0) + "%";
@@ -470,7 +519,7 @@
       return `<div class="act"><div class="act-head"><h3>${esc(act.name)}</h3><span>${esc(act.sub)}</span></div>
         ${rows.map(b => {
           const pos = ROUTE_POS[b.id], done = READ.has(b.id);
-          const kindTag = b.kind === "anthology" ? '<span class="tag">Anthology</span>' : b.kind === "novella" ? '<span class="tag">Novella</span>' : b.kind === "primarchs" ? '<span class="tag">Prequel</span>' : "";
+          const kindTag = b.kind === "anthology" ? '<span class="tag">Anthology</span>' : b.kind === "novella" ? '<span class="tag">Novella</span>' : b.kind === "primarchs" ? '<span class="tag">Prequel</span>' : b.kind === "short" ? '<span class="tag">Short</span>' : "";
           return `<div class="row${pos ? "" : " off"}${done ? " done" : ""}">
             <button class="chk${done ? " on" : ""}" data-read="${b.id}" aria-label="${done ? "Mark unread" : "Mark read"}: ${esc(b.title)}" aria-pressed="${done}">✓</button>
             <div class="idx">${pos || "·"}</div>
@@ -538,6 +587,7 @@
     renderArcChips();
     $("#tglAnth").addEventListener("change", e => { S.anth = e.target.checked; update(); });
     $("#tglPrim").addEventListener("change", e => { S.prim = e.target.checked; update(); });
+    $("#tglShorts").addEventListener("change", e => { S.shorts = e.target.checked; buildMap(); update(); });
     $("#tglAll").addEventListener("change", e => { S.showAll = e.target.checked; renderList(); });
     document.querySelectorAll(".tabs button").forEach(b => b.addEventListener("click", () => setView(b.dataset.view)));
     $("#drawerClose").addEventListener("click", closeDrawer);
@@ -550,7 +600,9 @@
     $("#btnZoomOut").addEventListener("click", () => svg.transition().duration(300).call(zoom.scaleBy, 1 / 1.3));
     window.addEventListener("hashchange", () => {
       const h = parseHash(); if (!h) return;
-      S.preset = h.preset; S.arcs = new Set(h.arcs.filter(a => arcById[a])); S.anth = h.anth; S.prim = h.prim;
+      const rebuild = S.shorts !== h.shorts;
+      S.preset = h.preset; S.arcs = new Set(h.arcs.filter(a => arcById[a])); S.anth = h.anth; S.prim = h.prim; S.shorts = h.shorts;
+      if (rebuild) buildMap();
       update();
     });
     buildMap();
