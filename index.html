@@ -1,0 +1,144 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>Roads to Terra · Horus Heresy Reading Map</title>
+  <meta name="description" content="An interactive map of every Horus Heresy and Siege of Terra book: follow the main story, pick side storylines, and find your own path to Terra without reading all 100+ books.">
+  <meta name="theme-color" content="#07080d">
+  <meta property="og:title" content="Roads to Terra · Horus Heresy Reading Map">
+  <meta property="og:description" content="Every Horus Heresy book as a metro map of storylines converging on the Siege of Terra. Find your route.">
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Ccircle cx='32' cy='32' r='22' fill='%231c3d6e'/%3E%3Ccircle cx='32' cy='32' r='22' fill='none' stroke='%23e9c46a' stroke-width='5'/%3E%3Cpath d='M32 6v52M6 32h52' stroke='%23e9c46a' stroke-width='3'/%3E%3C/svg%3E">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@500;700;900&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+  <header class="topbar">
+    <div class="brand">
+      <svg class="brand-mark" viewBox="0 0 64 64" aria-hidden="true">
+        <circle cx="32" cy="32" r="20" fill="#1c3d6e"/>
+        <circle cx="32" cy="32" r="20" fill="none" stroke="#e9c46a" stroke-width="4"/>
+        <path d="M32 4v56M4 32h56" stroke="#e9c46a" stroke-width="2.5" opacity=".8"/>
+      </svg>
+      <div>
+        <h1>Roads to Terra</h1>
+        <p class="tagline">An interactive reading map of the Horus Heresy</p>
+      </div>
+    </div>
+    <nav class="tabs" role="tablist" aria-label="Views">
+      <button role="tab" data-view="map" aria-selected="true">Map</button>
+      <button role="tab" data-view="list" aria-selected="false">Reading list</button>
+      <button role="tab" data-view="arcs" aria-selected="false">Storylines</button>
+      <button role="tab" data-view="about" aria-selected="false">About</button>
+    </nav>
+  </header>
+
+  <section class="routebar" aria-label="Choose your route">
+    <div class="presets" id="presets"></div>
+    <div class="route-summary" id="routeSummary"></div>
+  </section>
+
+  <section class="arcbar" aria-label="Add storylines">
+    <span class="arcbar-label">Add storylines</span>
+    <div class="arc-chips" id="arcChips"></div>
+    <div class="toggles">
+      <label class="switch"><input type="checkbox" id="tglAnth"><span></span>Anthologies</label>
+      <label class="switch"><input type="checkbox" id="tglPrim"><span></span>Primarchs prequels</label>
+    </div>
+  </section>
+
+  <main>
+    <!-- MAP VIEW -->
+    <section class="view view-map active" id="view-map" aria-label="Storyline map">
+      <div class="map-wrap" id="mapWrap">
+        <div class="lane-labels" id="laneLabels" aria-hidden="true"></div>
+        <svg id="map" role="img" aria-label="Metro-style map of Horus Heresy storylines converging on the Siege of Terra"></svg>
+        <div class="map-ctrls">
+          <button id="btnStart" title="Jump to the beginning">⟵ Start</button>
+          <button id="btnFit" title="Show the whole map">Fit all</button>
+          <button id="btnTerra" title="Jump to the Siege of Terra">Terra ⟶</button>
+          <button id="btnZoomIn" class="sq" aria-label="Zoom in">+</button>
+          <button id="btnZoomOut" class="sq" aria-label="Zoom out">−</button>
+        </div>
+        <div class="legend" id="legend">
+          <div class="lg-row"><span class="lg-dot core"></span>Essential</div>
+          <div class="lg-row"><span class="lg-dot rec"></span>Recommended</div>
+          <div class="lg-row"><span class="lg-dot opt"></span>Optional</div>
+          <div class="lg-row"><span class="lg-dot read"></span>Read</div>
+          <div class="lg-row"><span class="lg-route"></span>Your route</div>
+        </div>
+        <div class="hint" id="mapHint">Drag to pan · scroll or pinch to zoom · tap a book for details</div>
+      </div>
+      <div class="tooltip" id="tooltip" role="tooltip"></div>
+    </section>
+
+    <!-- LIST VIEW -->
+    <section class="view view-list" id="view-list" aria-label="Reading list">
+      <div class="list-inner">
+        <div class="list-head">
+          <div>
+            <h2 id="listTitle">Your route</h2>
+            <p id="listDesc" class="muted"></p>
+          </div>
+          <div class="progress-card">
+            <div class="progress-num"><span id="progRead">0</span> / <span id="progTotal">0</span> read</div>
+            <div class="progress"><div class="progress-fill" id="progFill"></div></div>
+            <label class="switch small"><input type="checkbox" id="tglAll"><span></span>Show all books</label>
+          </div>
+        </div>
+        <div id="listBody"></div>
+      </div>
+    </section>
+
+    <!-- STORYLINES VIEW -->
+    <section class="view view-arcs" id="view-arcs" aria-label="Storylines">
+      <div class="list-inner">
+        <h2>Storylines</h2>
+        <p class="muted lead">The Horus Heresy isn't one story but many, braided together. Each line below is a storyline you can follow. Add any of them to your route and they'll be woven into the reading order, every one of them converging on the Siege of Terra.</p>
+        <div class="arc-grid" id="arcGrid"></div>
+      </div>
+    </section>
+
+    <!-- ABOUT VIEW -->
+    <section class="view view-about" id="view-about" aria-label="About">
+      <div class="list-inner prose">
+        <h2>How to use this map</h2>
+        <p>The Horus Heresy runs to 54 numbered books, followed by the ten-volume Siege of Terra and a shelf of novellas and prequels. Almost nobody needs all of them. This map shows every book as a <strong>station</strong> on coloured <strong>storyline lines</strong>, read left to right, and every line converges on <strong>Terra</strong>.</p>
+        <ol>
+          <li><strong>Pick a route</strong> at the top: <em>Express</em> (the essentials), <em>Main Campaign</em> (every major storyline's key books) or <em>Completionist</em>.</li>
+          <li><strong>Add storylines</strong> you care about, such as the White Scars or Prospero. Their books get woven into your route.</li>
+          <li>The <span class="gold">glowing gold line</span> on the map is your route. The numbers on the stations are your reading order.</li>
+          <li>Open the <strong>Reading list</strong> to tick books off. Your progress is saved in this browser, and the link in your address bar shares your exact route.</li>
+        </ol>
+        <h2>How the routes were chosen</h2>
+        <p>Reading order follows Black Library's recommended order, which is essentially publication order with the Siege of Terra novellas slotted in. The <em>Express</em> and <em>Main Campaign</em> tiers distil the advice that keeps coming up in community reading guides on Reddit (r/Horus_Heresy, r/40kLore, r/Warhammer40k), the Bolter &amp; Chainsword forums and fan sites such as Track of Words:</p>
+        <ul>
+          <li>Read the opening five books first: the trilogy plus <em>Flight of the Eisenstein</em> and <em>Fulgrim</em>.</li>
+          <li>Treat <em>The First Heretic</em>, <em>Vengeful Spirit</em>, <em>The Master of Mankind</em>, <em>Praetorian of Dorn</em>, <em>Slaves to Darkness</em> and <em>The Buried Dagger</em> as must-reads before the Siege.</li>
+          <li>The Sons of Horus and Word Bearers matter most at the start, while the Imperial Fists, Blood Angels and White Scars matter most at the end.</li>
+          <li>Follow the Legions you love, and skip the ones you don't.</li>
+        </ul>
+        <p>"Essential", "recommended" and "optional" are judgement calls, not gospel. Some fans would fight you over <em>Know No Fear</em> or <em>Betrayer</em> not being essential. If a storyline grabs you, follow it.</p>
+        <h2>Spoilers</h2>
+        <p>Book blurbs are kept spoiler-light: they describe each book's premise, not its outcome. Storyline descriptions mention which characters reach Terra, but never what happens there.</p>
+        <h2>Not included</h2>
+        <p>The dozens of audio dramas, limited-edition novellas and short stories that were later collected into the anthologies, plus the post-Heresy follow-on series. Many of the best shorts are collected in the anthologies listed here.</p>
+        <p class="disclaimer">Unofficial fan project, not affiliated with or endorsed by Games Workshop or Black Library. The Horus Heresy, Warhammer 40,000 and all associated names are trademarks of Games Workshop Ltd. Please support the authors by buying the books.</p>
+      </div>
+    </section>
+  </main>
+
+  <!-- DETAIL DRAWER -->
+  <aside class="drawer" id="drawer" aria-hidden="true" aria-labelledby="dTitle">
+    <button class="drawer-close" id="drawerClose" aria-label="Close details">×</button>
+    <div class="drawer-body" id="drawerBody"></div>
+  </aside>
+  <div class="scrim" id="scrim"></div>
+
+  <script src="js/vendor/d3.min.js"></script>
+  <script src="js/data.js"></script>
+  <script src="js/app.js"></script>
+</body>
+</html>
