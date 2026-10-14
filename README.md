@@ -1,6 +1,6 @@
 # Roads to Terra: an interactive Horus Heresy reading map
 
-**Live site:** https://rymdstedt.github.io/horusheresy/
+**Live site:** https://rymdstedt.github.io/HorusHeresy/
 
 Every Horus Heresy novel, anthology, Primarchs prequel and Siege of Terra book, drawn as a metro map. Coloured storyline lines all converge on Terra.
 
